@@ -21,7 +21,7 @@
 
     TODOs:
 
-    There are hacks here, and most of them are in the interest of getting things done while I'map still sane.
+    There are hacks here, and most of them are in the interest of getting things done while I'm still sane.
     I fully intend to go through all these issues and iron over the issues and flesh out the oversimplifications.
     However I am but one person and this is largely experimental. Set your expectations accordingly.
 
@@ -33,7 +33,7 @@
         internal array. If we continue using opaque pointers, we can use a small object allocator.
     
     * Device selection
-        To make things simple for myself, I'map avoiding exposing an API for in-depth device selection until I've got
+        To make things simple for myself, I'm avoiding exposing an API for in-depth device selection until I've got
         more interesting problems solved. Right now, the CreateDevice() function will simply ensure that the device
         being used is correct for the backend and is compatible with a given surface. Maybe I'll borrow from SYCL and
         expose device selector functions that let users supply a function. I think most people find the Adapter /
