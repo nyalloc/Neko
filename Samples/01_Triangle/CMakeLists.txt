@@ -1,23 +1,20 @@
 
 add_executable(01_Triangle Triangle.c)
 
-add_resource_library(TriangleShaders)
-
-add_shader_resource(TriangleShaders
+add_shader_module(01_Triangle
     NAME TriangleVertex
     INPUT Triangle.hlsl
-    ENTRY_POINT vsMain
-    STAGE vertex
+    ENTRY_POINT vs_main
+    STAGE vs
 )
 
-add_shader_resource(TriangleShaders
-    NAME TrianglePixel
+add_shader_module(01_Triangle
+    NAME TriangleFragment
     INPUT Triangle.hlsl
-    ENTRY_POINT psMain
-    STAGE pixel
+    ENTRY_POINT ps_main
+    STAGE ps
 )
 
 target_link_libraries(01_Triangle PUBLIC
     SampleBase
-    TriangleShaders
 )

@@ -29,6 +29,7 @@ typedef enum NkResult NkResult;
 
 NkSampleApp nkCreateSampleApp(const NkSampleAppInfo* desc);
 void nkDestroySampleApp(NkSampleApp sample);
+
 NkBool nkSampleAppProcessEvents(NkSampleApp sample, NkSampleAppState* state);
 NkNativeSurface nkSampleAppGetNativeSurface(NkSampleApp sample);
 

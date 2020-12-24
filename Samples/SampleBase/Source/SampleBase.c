@@ -1,19 +1,17 @@
-#include <NekoSample/NekoSample.h>
+#include <Neko/Sample.h>
 #include <Neko/Neko.h>
 #include <SDL.h>
 #include <SDL_syswm.h>
 #include <cassert>
 
-struct NkSampleApp_
-{
+struct NkSampleApp_ {
     SDL_Window* window;
     NkSampleAppState state;
     NkSampleAppResize resize;
     SDL_Event event;
 };
 
-NkSampleApp nkCreateSampleApp(const NkSampleAppInfo* desc)
-{
+NkSampleApp nkCreateSampleApp(const NkSampleAppInfo* desc) {
     struct NkSampleApp_* newSample = (NkSampleApp)malloc(sizeof(struct NkSampleApp_));
     assert(newSample);
 
@@ -37,34 +35,28 @@ NkSampleApp nkCreateSampleApp(const NkSampleAppInfo* desc)
     return newSample;
 }
 
-void nkDestroySampleApp(NkSampleApp sample)
-{
+void nkDestroySampleApp(NkSampleApp sample) {
     SDL_DestroyWindow(sample->window);
     free(sample);
 }
 
-NkBool nkSampleAppProcessEvents(NkSampleApp sample, NkSampleAppState* state)
-{
+NkBool nkSampleAppProcessEvents(NkSampleApp sample, NkSampleAppState* state) {
     sample->state.resize = NULL;
 
-    while (SDL_PollEvent(&sample->event))
-    {
-        if (sample->event.type == SDL_QUIT)
-        {
+    while (SDL_PollEvent(&sample->event)) {
+        if (sample->event.type == SDL_QUIT) {
             return NkFalse;
         }
     }
 
-    if (state)
-    {
+    if (state) {
         *state = sample->state;
     }
 
     return NkTrue;
 }
 
-NkNativeSurface nkSampleAppGetNativeSurface(NkSampleApp sample)
-{
+NkNativeSurface nkSampleAppGetNativeSurface(NkSampleApp sample) {
     NkNativeSurface nativeSurface;
 
     SDL_SysWMinfo wmInfo;

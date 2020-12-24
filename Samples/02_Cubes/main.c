@@ -1,6 +1,6 @@
 
 #include <Neko/Neko.h>
-#include <NekoSample/NekoSample.h>
+#include <Neko/Sample.h>
 
 int main()
 {

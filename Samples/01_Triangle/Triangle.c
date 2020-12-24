@@ -1,7 +1,8 @@
 ﻿
 #include <Neko/Neko.h>
-#include <Neko/Shaders/Triangle.h>
-#include <NekoSample/NekoSample.h>
+#include <Neko/Sample.h>
+#include <Neko/Shaders/TriangleFragment.h>
+#include <Neko/Shaders/TriangleVertex.h>
 
 typedef struct PositionColorVertex {
     NkFloat3 position;
@@ -16,8 +17,8 @@ static const PositionColorVertex vertices[] = {
 
 int main() {
 
-    uint32_t windowHeight = 720;
-    uint32_t windowWidth = 1280;
+    const uint32_t windowHeight = 720;
+    const uint32_t windowWidth = 1280;
 
     const NkSampleApp sample = nkCreateSampleApp(&(NkSampleAppInfo) {
         .width  = windowWidth,
@@ -37,14 +38,19 @@ int main() {
 
     const NkQueue queue = nkDeviceGetDefaultQueue(device);
 
-    const NkShaderModule triangleShader = nkCreateShaderModule(device, &(NkShaderModuleInfo) {
-        .source = TriangleShaderSource,
-        .size = sizeof(TriangleShaderSource)
+    const NkShaderModule vertexShader = nkCreateShaderModule(device, &(NkShaderModuleInfo) {
+        .source = NkTriangleFragmentSource,
+        .size = NkTriangleFragmentSourceSize
+    });
+
+    const NkShaderModule pixelShader = nkCreateShaderModule(device, &(NkShaderModuleInfo) {
+        .source = NkTriangleVertexSource,
+        .size = NkTriangleVertexSourceSize
     });
 
     const NkRenderPipeline renderPipeline = nkCreateRenderPipeline(device, &(NkRenderPipelineInfo) {
-        .vertexStage   = { .module = triangleShader, .entryPoint = "vertexMain" },
-        .fragmentStage = { .module = triangleShader, .entryPoint = "pixelMain"  },
+        .vertexStage   = { .module = vertexShader, .entryPoint = "vertexMain" },
+        .fragmentStage = { .module = pixelShader, .entryPoint = "pixelMain"  },
         .primitiveTopology = NkPrimitiveTopology_TriangleList,
         .vertexState = &(NkVertexStateInfo) {
             .indexFormat = NkIndexFormat_Uint16,
@@ -63,10 +69,10 @@ int main() {
 
     const NkBuffer vertexBuffer = nkCreateBuffer(device, &(NkBufferInfo) {
         .usage = NkBufferUsage_CopyDst | NkBufferUsage_Vertex,
-        .size = sizeof(vertices)
+        .size = sizeof vertices
     });
 
-    nkQueueWriteBuffer(queue, vertexBuffer, 0, vertices, sizeof(vertices));
+    nkQueueWriteBuffer(queue, vertexBuffer, 0, vertices, sizeof vertices);
 
     const NkSwapChain swapChain = nkCreateSwapChain(device, surface, &(NkSwapChainInfo) {
         .width  = windowWidth,
@@ -99,7 +105,8 @@ int main() {
     nkDestroyBuffer(vertexBuffer);
     nkDestroySwapChain(swapChain);
     nkDestroyRenderPipeline(renderPipeline);
-    nkDestroyShaderModule(triangleShader);
+    nkDestroyShaderModule(vertexShader);
+    nkDestroyShaderModule(pixelShader);
     nkDestroyDevice(device);
     nkDestroySurface(surface);
     nkDestroyInstance(instance);
