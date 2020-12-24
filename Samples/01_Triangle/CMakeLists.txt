@@ -18,3 +18,5 @@ add_shader_module(01_Triangle
 target_link_libraries(01_Triangle PUBLIC
     SampleBase
 )
+
+set_neko_compiler_options(01_Triangle)
