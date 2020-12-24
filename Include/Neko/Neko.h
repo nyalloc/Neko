@@ -1020,7 +1020,7 @@ void nkCommandAllocatorReset(NkCommandAllocator* const allocator) {
 
 #define NK_IS_POWER_OF_TWO(value) (value != 0 && (value & (value - 1)) == 0)
 
-#define NK_ALIGN_TO(type, value, alignment) (NK_CAST(type, ((NK_CAST(size_t, value) + (alignment - 1)) & ~(alignment - 1))))
+#define NK_ALIGN_TO(type, value, alignment) (NK_CAST(type,  (((value) + (alignment) - 1) & ~((alignment) - 1))))
 
 #define NK_PTR_ALIGN_TO(type, value, alignment) NK_PTR_CAST(type*, (NK_ALIGN_TO(NK_PTR_CAST(uintptr_t, value), alignment)))
 
@@ -1114,33 +1114,59 @@ NkCommandEncoder nkCreateCommandEncoder(NkDevice device) {
     NkCommandEncoder commandEncoder = NK_PTR_CAST(NkCommandEncoder, NK_MALLOC(sizeof(struct NkCommandEncoderImpl)));
     NK_ASSERT(commandEncoder);
     commandEncoder->allocator = nkCreateCommandAllocator(NK_COMMAND_ALLOCATOR_SIZE);
+    return commandEncoder;
 }
 
 typedef enum NkCommandType {
-    NkCommandType_RenderPass
+    NkCommandType_BeginComputePass,
+    NkCommandType_BeginRenderPass,
+    NkCommandType_RenderPassEncoderSetPipeline,
+    NkCommandType_RenderPassEncoderSetVertexBuffer,
+    NkCommandType_RenderPassEncoderDraw
 } NkCommandType;
 
-typedef struct NkRenderPassEncoderBeginCommand {
+typedef struct NkBeginComputePassCommand {
     NkCommandType type;
-} NkRenderPassEncoderBeginCommand;
+} NkBeginComputePassCommand;
 
 // Methods of CommandEncoder
 NkComputePassEncoder nkCommandEncoderBeginComputePass(NkCommandEncoder commandEncoder) {
 
+    NK_ASSERT(commandEncoder);
+
+    NkBeginComputePassCommand* command = NK_PTR_CAST(NkBeginComputePassCommand*, nkCommandAllocatorAllocate(&commandEncoder->allocator, sizeof(NkBeginComputePassCommand), NK_ALIGN_OF(NkBeginComputePassCommand)));
+    NK_ASSERT(command);
+
+    command->type = NkCommandType_BeginComputePass;
+
+    NkComputePassEncoder passEncoder = NK_PTR_CAST(NkComputePassEncoder, NK_MALLOC(sizeof(struct NkComputePassEncoderImpl)));
+    NK_ASSERT(passEncoder);
+
+    passEncoder->allocator = &commandEncoder->allocator;
+
+    return passEncoder;
 }
 
+typedef struct NkBeginRenderPassCommand {
+    NkCommandType type;
+} NkBeginRenderPassCommand;
 
 NkRenderPassEncoder nkCommandEncoderBeginRenderPass(NkCommandEncoder commandEncoder, const NkRenderPassInfo* descriptor) {
 
     NK_ASSERT(commandEncoder);
     NK_ASSERT(descriptor);
 
-    NkRenderPassEncoderBeginCommand* command = NK_PTR_CAST(NkRenderPassEncoderBeginCommand*, nkCommandAllocatorAllocate(&commandEncoder->allocator, sizeof(NkRenderPassEncoderBeginCommand), NK_ALIGN_OF(NkRenderPassEncoderBeginCommand)));
+    NkBeginRenderPassCommand* command =
+        NK_PTR_CAST(NkBeginRenderPassCommand*,
+            nkCommandAllocatorAllocate(&commandEncoder->allocator,
+            sizeof(NkBeginRenderPassCommand),
+            NK_ALIGN_OF(NkBeginRenderPassCommand)));
     NK_ASSERT(command);
 
-    command->type = NkCommandType_RenderPass;
+    command->type = NkCommandType_BeginRenderPass;
 
-    NkRenderPassEncoder passEncoder = NK_PTR_CAST(NkRenderPassEncoder, NK_MALLOC(sizeof(struct NkRenderPassEncoderImpl)));
+    NkRenderPassEncoder passEncoder =
+        NK_PTR_CAST(NkRenderPassEncoder, NK_MALLOC(sizeof(struct NkRenderPassEncoderImpl)));
     NK_ASSERT(passEncoder);
 
     passEncoder->allocator = &commandEncoder->allocator;
@@ -1243,8 +1269,22 @@ void nkRenderPassEncoderBeginPipelineStatisticsQuery(NkRenderPassEncoder renderP
 
 }
 
+typedef struct NkRenderPassEncoderDraw {
+    NkCommandType type;
+} NkRenderPassEncoderDraw;
+
 void nkRenderPassEncoderDraw(NkRenderPassEncoder renderPassEncoder, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
 
+    NK_ASSERT(renderPassEncoder);
+
+    NkRenderPassEncoderDraw* command =
+        NK_PTR_CAST(NkRenderPassEncoderDraw*,
+            nkCommandAllocatorAllocate(renderPassEncoder->allocator,
+            sizeof(NkRenderPassEncoderDraw),
+            NK_ALIGN_OF(NkRenderPassEncoderDraw)));
+    NK_ASSERT(command);
+
+    command->type = NkCommandType_RenderPassEncoderDraw;
 }
 
 void nkRenderPassEncoderDrawIndexed(NkRenderPassEncoder renderPassEncoder, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex, uint32_t firstInstance) {
@@ -1299,8 +1339,23 @@ void nkRenderPassEncoderSetIndexBuffer(NkRenderPassEncoder renderPassEncoder, Nk
 
 }
 
+typedef struct NkRenderPassEncoderSetPipelineCommand {
+    NkCommandType type;
+} NkRenderPassEncoderSetPipelineCommand;
+
 void nkRenderPassEncoderSetPipeline(NkRenderPassEncoder renderPassEncoder, NkRenderPipeline pipeline) {
 
+    NK_ASSERT(renderPassEncoder);
+    NK_ASSERT(pipeline);
+
+    NkRenderPassEncoderSetPipelineCommand* command = 
+        NK_PTR_CAST(NkRenderPassEncoderSetPipelineCommand*, 
+            nkCommandAllocatorAllocate(renderPassEncoder->allocator,
+            sizeof(NkRenderPassEncoderSetPipelineCommand),
+            NK_ALIGN_OF(NkRenderPassEncoderSetPipelineCommand)));
+    NK_ASSERT(command);
+
+    command->type = NkCommandType_RenderPassEncoderSetPipeline;
 }
 
 void nkRenderPassEncoderSetScissorRect(NkRenderPassEncoder renderPassEncoder, uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
@@ -1311,8 +1366,22 @@ void nkRenderPassEncoderSetStencilReference(NkRenderPassEncoder renderPassEncode
 
 }
 
+typedef struct NkRenderPassEncoderSetVertexBuffer {
+    NkCommandType type;
+} NkRenderPassEncoderSetVertexBuffer;
+
 void nkRenderPassEncoderSetVertexBuffer(NkRenderPassEncoder renderPassEncoder, uint32_t slot, NkBuffer buffer, uint64_t offset, uint64_t size) {
 
+    NK_ASSERT(renderPassEncoder);
+
+    NkRenderPassEncoderSetVertexBuffer* command =
+        NK_PTR_CAST(NkRenderPassEncoderSetVertexBuffer*,
+            nkCommandAllocatorAllocate(renderPassEncoder->allocator,
+                sizeof(NkRenderPassEncoderSetVertexBuffer),
+                NK_ALIGN_OF(NkRenderPassEncoderSetVertexBuffer)));
+    NK_ASSERT(command);
+
+    command->type = NkCommandType_RenderPassEncoderSetVertexBuffer;
 }
 
 void nkRenderPassEncoderSetViewport(NkRenderPassEncoder renderPassEncoder, float x, float y, float width, float height, float minDepth, float maxDepth) {
