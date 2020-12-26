@@ -930,9 +930,9 @@ NK_EXPORT NkTextureView nkCreateTextureView(NkTexture texture, const NkTextureVi
 /*
     Encoder API design considerations.
 
-    BGFX and Dawn take the approach of recording commands on the CPU to, and then
+    BGFX and Dawn take the approach of recording commands on the CPU, and then
     deferring recording to the backend command API until you actually submit the work.
-    The WebGPU specification seems to suggest that this approach is intended for all
+    The WebGPU design documents seem to suggest that this approach is intended for all
     implementations of WebGPU. This hides a bunch of complexity from the user, but it
     requires a bit of work from the implementation.
 
@@ -942,9 +942,6 @@ NK_EXPORT NkTextureView nkCreateTextureView(NkTexture texture, const NkTextureVi
     meaning we could potentially have a shared Encoder API implementation. Freeing the
     encoder implementation from the backend also means we are in control of the implementation,
     and can focus on making it nice and simple.
-
-    I think to avoid command allocation getting slow, we should probably use a
-    linear allocator.
  */
 
 #if defined(__cplusplus)
@@ -1484,9 +1481,7 @@ const NkBool NkEnableValidationLayers = NkFalse;
 const NkBool NkEnableValidationLayers = NkTrue;
 #endif
 
-struct NkAdapterImpl {
-    int32_t foo;
-};
+// any structs with int32_t foo are unimplemented. This is just to let the code compile in C mode, where empty structs are illegal.
 
 struct NkBindGroupImpl {
     int32_t foo;
@@ -1558,6 +1553,7 @@ struct NkSamplerImpl {
 };
 
 struct NkShaderModuleImpl {
+    VkDevice device;
     VkShaderModule module;
 };
 
@@ -1767,6 +1763,15 @@ NkRenderBundleEncoder nkCreateRenderBundleEncoder(NkDevice device, const NkRende
 
 NkRenderPipeline nkCreateRenderPipeline(NkDevice device, const NkRenderPipelineInfo* descriptor) {
 
+    NK_ASSERT(device);
+    NK_ASSERT(descriptor);
+
+    NkRenderPipeline renderPipeline = NK_PTR_CAST(NkRenderPipeline, NK_MALLOC(sizeof(struct NkRenderPipelineImpl)));
+    NK_ASSERT(renderPipeline);
+
+
+
+    return renderPipeline;
 }
 
 NkSampler nkCreateSampler(NkDevice device, const NkSamplerInfo* descriptor) {
@@ -1778,7 +1783,7 @@ NkShaderModule nkCreateShaderModule(NkDevice device, const NkShaderModuleInfo* d
     NK_ASSERT(device);
     NK_ASSERT(descriptor);
 
-    NkShaderModule shaderModule = NK_PTR_CAST(NkShaderModule, NK_MALLOC(sizeof(struct NkShaderModuleInfo)));
+    NkShaderModule shaderModule = NK_PTR_CAST(NkShaderModule, NK_MALLOC(sizeof(struct NkShaderModuleImpl)));
     NK_ASSERT(shaderModule);
 
     // SPIR-V code is passed to Vulkan as an array of uint32_t. Neko's interface is generalised so it takes IR
@@ -1803,6 +1808,10 @@ NkShaderModule nkCreateShaderModule(NkDevice device, const NkShaderModuleInfo* d
 }
 
 void nkDestroyShaderModule(NkShaderModule shaderModule) {
+
+    NK_ASSERT(shaderModule);
+    vkDestroyShaderModule(shaderModule->device, shaderModule->module, NULL);
+    NK_FREE(shaderModule);
 }
 
 typedef struct NkVkSurfaceSupportDetails {
@@ -2349,6 +2358,9 @@ void nkRenderBundleEncoderSetVertexBuffer(NkRenderBundleEncoder renderBundleEnco
 // Methods of RenderPipeline
 void nkDestroyRenderPipeline(NkRenderPipeline renderPipeline) {
 
+    NK_ASSERT(renderPipeline);
+
+    NK_FREE(renderPipeline);
 }
 
 NkBindGroupLayout nkRenderPipelineGetBindGroupLayout(NkRenderPipeline renderPipeline, uint32_t groupIndex) {

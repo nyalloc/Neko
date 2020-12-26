@@ -4,12 +4,12 @@
 #include <Neko/Shaders/TriangleFragment.h>
 #include <Neko/Shaders/TriangleVertex.h>
 
-typedef struct PositionColorVertex {
+typedef struct NkPositionColorVertex {
     NkFloat3 position;
     NkFloat4 color;
-} PositionColorVertex;
+} NkPositionColorVertex;
 
-static const PositionColorVertex vertices[] = {
+static const NkPositionColorVertex vertices[] = {
     { .position = { 0.0f, 0.5f, 0.5f }, .color = { 1.0f, 0.0f, 0.0f, 1.0f } },
     { .position = { 0.5f,-0.5f, 0.5f }, .color = { 0.0f, 1.0f, 0.0f, 1.0f } },
     { .position = {-0.5f,-0.5f, 0.5f }, .color = { 0.0f, 0.0f, 1.0f, 1.0f } }
@@ -18,7 +18,7 @@ static const PositionColorVertex vertices[] = {
 int main() {
 
     const uint32_t windowHeight = 720;
-    const uint32_t windowWidth = 1280;
+    const uint32_t windowWidth  = 1280;
 
     const NkSampleApp sample = nkCreateSampleApp(&(NkSampleAppInfo) {
         .width  = windowWidth,
@@ -40,22 +40,22 @@ int main() {
 
     const NkShaderModule vertexShader = nkCreateShaderModule(device, &(NkShaderModuleInfo) {
         .source = NkTriangleFragmentSource,
-        .size = NkTriangleFragmentSourceSize
+        .size   = NkTriangleFragmentSourceSize
     });
 
     const NkShaderModule pixelShader = nkCreateShaderModule(device, &(NkShaderModuleInfo) {
         .source = NkTriangleVertexSource,
-        .size = NkTriangleVertexSourceSize
+        .size   = NkTriangleVertexSourceSize
     });
 
     const NkRenderPipeline renderPipeline = nkCreateRenderPipeline(device, &(NkRenderPipelineInfo) {
         .vertexStage   = { .module = vertexShader, .entryPoint = "vertexMain" },
-        .fragmentStage = { .module = pixelShader, .entryPoint = "pixelMain"  },
+        .fragmentStage = { .module = pixelShader,  .entryPoint = "pixelMain"  },
         .primitiveTopology = NkPrimitiveTopology_TriangleList,
         .vertexState = &(NkVertexStateInfo) {
             .indexFormat = NkIndexFormat_Uint16,
             .vertexBuffers = &(NkVertexBufferLayoutInfo) {
-                .arrayStride = sizeof(PositionColorVertex),
+                .arrayStride = sizeof(NkPositionColorVertex),
                 .stepMode = NkInputStepMode_Vertex,
                 .attributes = (NkVertexAttributeInfo[]) {
                     { .format = NkVertexFormat_Float4, .offset = 0, .shaderLocation = 0 },
@@ -69,7 +69,7 @@ int main() {
 
     const NkBuffer vertexBuffer = nkCreateBuffer(device, &(NkBufferInfo) {
         .usage = NkBufferUsage_CopyDst | NkBufferUsage_Vertex,
-        .size = sizeof vertices
+        .size  = sizeof vertices
     });
 
     nkQueueWriteBuffer(queue, vertexBuffer, 0, vertices, sizeof vertices);
