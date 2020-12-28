@@ -53,7 +53,6 @@ int main() {
         .fragmentStage = { .module = pixelShader,  .entryPoint = "pixelMain"  },
         .primitiveTopology = NkPrimitiveTopology_TriangleList,
         .vertexState = &(NkVertexStateInfo) {
-            .indexFormat = NkIndexFormat_Uint16,
             .vertexBuffers = &(NkVertexBufferLayoutInfo) {
                 .arrayStride = sizeof(NkPositionColorVertex),
                 .stepMode = NkInputStepMode_Vertex,

@@ -756,7 +756,6 @@ typedef struct NkRenderPassInfo {
 } NkRenderPassInfo;
 
 typedef struct NkVertexStateInfo {
-    NkIndexFormat indexFormat;
     uint32_t vertexBufferCount;
     const NkVertexBufferLayoutInfo* vertexBuffers;
 } NkVertexStateInfo;
@@ -1389,6 +1388,9 @@ void nkRenderPassEncoderWriteTimestamp(NkRenderPassEncoder renderPassEncoder, Nk
 
 }
 
+#define NK_MAX_BUFFERS 16
+#define NK_MAX_ATTRIBUTES 16
+
 #ifdef NK_VULKAN_IMPLEMENTATION
 
 #include <vulkan/vulkan.h>
@@ -1545,7 +1547,7 @@ struct NkRenderBundleEncoderImpl {
 };
 
 struct NkRenderPipelineImpl {
-    int32_t foo;
+    VkPipeline pipeline;
 };
 
 struct NkSamplerImpl {
@@ -1761,15 +1763,302 @@ NkRenderBundleEncoder nkCreateRenderBundleEncoder(NkDevice device, const NkRende
 
 }
 
+static VkVertexInputRate nkVkInputRate(NkInputStepMode stepMode) {
+    switch (stepMode) {
+    case NkInputStepMode_Vertex:
+        return VK_VERTEX_INPUT_RATE_VERTEX;
+    case NkInputStepMode_Instance:
+        return VK_VERTEX_INPUT_RATE_INSTANCE;
+    }
+    return VK_VERTEX_INPUT_RATE_MAX_ENUM;
+}
+
+static VkFormat nkVkFormat(NkVertexFormat format) {
+    switch (format) {
+    case NkVertexFormat_UChar2:
+        return VK_FORMAT_R8G8_UINT;
+    case NkVertexFormat_UChar4:
+        return VK_FORMAT_R8G8B8A8_UINT;
+    case NkVertexFormat_Char2:
+        return VK_FORMAT_R8G8_SINT;
+    case NkVertexFormat_Char4:
+        return VK_FORMAT_R8G8B8A8_SINT;
+    case NkVertexFormat_UChar2Norm:
+        return VK_FORMAT_R8G8_UNORM;
+    case NkVertexFormat_UChar4Norm:
+        return VK_FORMAT_R8G8B8A8_UNORM;
+    case NkVertexFormat_Char2Norm:
+        return VK_FORMAT_R8G8_SNORM;
+    case NkVertexFormat_Char4Norm:
+        return VK_FORMAT_R8G8B8A8_SNORM;
+    case NkVertexFormat_UShort2:
+        return VK_FORMAT_R16G16_UINT;
+    case NkVertexFormat_UShort4:
+        return VK_FORMAT_R16G16B16A16_UINT;
+    case NkVertexFormat_Short2:
+        return VK_FORMAT_R16G16_SINT;
+    case NkVertexFormat_Short4:
+        return VK_FORMAT_R16G16B16A16_SINT;
+    case NkVertexFormat_UShort2Norm:
+        return VK_FORMAT_R16G16_UNORM;
+    case NkVertexFormat_UShort4Norm:
+        return VK_FORMAT_R16G16B16A16_UNORM;
+    case NkVertexFormat_Short2Norm:
+        return VK_FORMAT_R16G16_SNORM;
+    case NkVertexFormat_Short4Norm:
+        return VK_FORMAT_R16G16B16A16_SNORM;
+    case NkVertexFormat_Half2:
+        return VK_FORMAT_R16G16_SFLOAT;
+    case NkVertexFormat_Half4:
+        return VK_FORMAT_R16G16B16A16_SFLOAT;
+    case NkVertexFormat_Float:
+        return VK_FORMAT_R32_SFLOAT;
+    case NkVertexFormat_Float2:
+        return VK_FORMAT_R32G32_SFLOAT;
+    case NkVertexFormat_Float3:
+        return VK_FORMAT_R32G32B32_SFLOAT;
+    case NkVertexFormat_Float4:
+        return VK_FORMAT_R32G32B32A32_SFLOAT;
+    case NkVertexFormat_UInt:
+        return VK_FORMAT_R32_UINT;
+    case NkVertexFormat_UInt2:
+        return VK_FORMAT_R32G32_UINT;
+    case NkVertexFormat_UInt3:
+        return VK_FORMAT_R32G32B32_UINT;
+    case NkVertexFormat_UInt4:
+        return VK_FORMAT_R32G32B32A32_UINT;
+    case NkVertexFormat_Int:
+        return VK_FORMAT_R32_SINT;
+    case NkVertexFormat_Int2:
+        return VK_FORMAT_R32G32_SINT;
+    case NkVertexFormat_Int3:
+        return VK_FORMAT_R32G32B32_SINT;
+    case NkVertexFormat_Int4:
+        return VK_FORMAT_R32G32B32A32_SINT;
+    }
+    return VK_FORMAT_MAX_ENUM;
+}
+
+static VkPrimitiveTopology nkVkPrimitiveTopology(NkPrimitiveTopology topology) {
+    switch (topology) {
+    case NkPrimitiveTopology_PointList:
+        return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    case NkPrimitiveTopology_LineList:
+        return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+    case NkPrimitiveTopology_LineStrip:
+        return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+    case NkPrimitiveTopology_TriangleList:
+        return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    case NkPrimitiveTopology_TriangleStrip:
+        return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    }
+    return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
+}
+
+VkBool32 nkVkShouldEnablePrimitiveRestart(NkPrimitiveTopology topology) {
+    // Primitive restart is always enabled in Neko (due to Metal always enabling primitive restart)
+    // but Vulkan validation rules ask that primitive restart be only enabled on primitive topologies
+    // that support restarting.
+
+    switch (topology) {
+    case NkPrimitiveTopology_PointList:
+    case NkPrimitiveTopology_LineList:
+    case NkPrimitiveTopology_TriangleList:
+        return false;
+    case NkPrimitiveTopology_LineStrip:
+    case NkPrimitiveTopology_TriangleStrip:
+        return true;
+    }
+}
+
 NkRenderPipeline nkCreateRenderPipeline(NkDevice device, const NkRenderPipelineInfo* descriptor) {
 
     NK_ASSERT(device);
     NK_ASSERT(descriptor);
 
-    NkRenderPipeline renderPipeline = NK_PTR_CAST(NkRenderPipeline, NK_MALLOC(sizeof(struct NkRenderPipelineImpl)));
+    NkRenderPipeline renderPipeline =
+        NK_PTR_CAST(NkRenderPipeline, NK_MALLOC(sizeof(struct NkRenderPipelineImpl)));
     NK_ASSERT(renderPipeline);
 
+    VkGraphicsPipelineCreateInfo createInfo;
+    {
+        createInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        createInfo.pNext = NULL;
+        createInfo.flags = 0;
 
+        createInfo.pTessellationState = NULL;
+        createInfo.pViewportState = NULL;
+
+        VkPipelineShaderStageCreateInfo vertShaderStageInfo;
+        {
+            vertShaderStageInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            vertShaderStageInfo.pNext  = NULL;
+            vertShaderStageInfo.flags  = 0;
+            vertShaderStageInfo.stage  = VK_SHADER_STAGE_VERTEX_BIT;
+            vertShaderStageInfo.module = descriptor->vertexStage.module->module;
+            vertShaderStageInfo.pName  = descriptor->vertexStage.entryPoint;
+            vertShaderStageInfo.pSpecializationInfo = NULL;
+        }
+
+        VkPipelineShaderStageCreateInfo fragShaderStageInfo;
+        {
+            fragShaderStageInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            fragShaderStageInfo.pNext  = NULL;
+            fragShaderStageInfo.flags  = 0;
+            fragShaderStageInfo.stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
+            fragShaderStageInfo.module = descriptor->fragmentStage.module->module;
+            fragShaderStageInfo.pName  = descriptor->fragmentStage.entryPoint;
+            fragShaderStageInfo.pSpecializationInfo = NULL;
+        }
+
+        VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+        createInfo.pStages    = shaderStages;
+        createInfo.stageCount = 2;
+
+        // TODO: set up default vertex state info when user doesn't supply a custom one.
+        // For now just assert it's not NULL.
+        NK_ASSERT(descriptor->vertexState);
+
+        uint32_t bindingCount = 0;
+        VkVertexInputBindingDescription bindings[NK_MAX_BUFFERS];
+
+        uint32_t attributeCount = 0;
+        VkVertexInputAttributeDescription attributes[NK_MAX_ATTRIBUTES];
+
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo;
+        {
+            for (uint32_t slot = 0; slot < descriptor->vertexState->vertexBufferCount; slot++) {
+
+                NkVertexBufferLayoutInfo* vertexBufferLayoutInfo =
+                    descriptor->vertexState->vertexBuffers + slot;
+
+                if (vertexBufferLayoutInfo->attributeCount == 0) {
+                    continue;
+                }
+
+                VkVertexInputBindingDescription* bindingDesc = bindings + bindingCount;
+                bindingDesc->binding = slot;
+                bindingDesc->stride = vertexBufferLayoutInfo->arrayStride;
+                bindingDesc->inputRate = nkVkInputRate(vertexBufferLayoutInfo->stepMode);
+                bindingCount++;
+
+                for (uint32_t attributeIndex = 0; attributeIndex < vertexBufferLayoutInfo->attributeCount; attributeIndex++) {
+
+                    NkVertexAttributeInfo* vertexAttributeInfo =
+                        vertexBufferLayoutInfo->attributes + attributeIndex;
+
+                    VkVertexInputAttributeDescription* attributeDesc = attributes + attributeCount;
+                    attributeDesc->location = vertexAttributeInfo->shaderLocation;
+                    attributeDesc->binding = slot;
+                    attributeDesc->format = nkVkFormat(vertexAttributeInfo->format);
+                    attributeDesc->offset = vertexAttributeInfo->offset;
+
+                    attributeCount++;
+                }
+            }
+
+            vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+            vertexInputInfo.pNext = NULL;
+            vertexInputInfo.flags = 0;
+            vertexInputInfo.vertexBindingDescriptionCount = bindingCount;
+            vertexInputInfo.pVertexBindingDescriptions = bindings;
+            vertexInputInfo.vertexAttributeDescriptionCount = attributeCount;
+            vertexInputInfo.pVertexAttributeDescriptions = attributes;
+            createInfo.pVertexInputState = &vertexInputInfo;
+        }
+
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly;
+        {
+            inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+            inputAssembly.pNext = NULL;
+            inputAssembly.flags = 0;
+            inputAssembly.topology = nkVkPrimitiveTopology(descriptor->primitiveTopology);
+            inputAssembly.primitiveRestartEnable = nkVkShouldEnablePrimitiveRestart(descriptor->primitiveTopology);
+            createInfo.pInputAssemblyState = &inputAssembly;
+        }
+
+        VkPipelineRasterizationStateCreateInfo rasterizer;
+        {
+            rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+            rasterizer.pNext = NULL;
+            rasterizer.flags = 0;
+            rasterizer.rasterizerDiscardEnable = VK_FALSE;
+            rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+            rasterizer.lineWidth = 1.0f;
+            rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+            rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+            rasterizer.depthBiasEnable = VK_FALSE;
+            rasterizer.depthBiasConstantFactor = 0.0f; // Optional
+            rasterizer.depthBiasClamp = 0.0f; // Optional
+            rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
+            rasterizer.depthClampEnable = VK_FALSE;
+            createInfo.pRasterizationState = &rasterizer;
+        }
+
+        VkPipelineMultisampleStateCreateInfo multisampling;
+        {
+            multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+            multisampling.pNext = NULL;
+            multisampling.flags = 0;
+            multisampling.sampleShadingEnable = VK_FALSE;
+            multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+            multisampling.minSampleShading = 1.0f; // Optional
+            multisampling.pSampleMask = NULL; // Optional
+            multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
+            multisampling.alphaToOneEnable = VK_FALSE; // Optional
+            createInfo.pMultisampleState = &multisampling;
+        }
+
+        VkPipelineColorBlendAttachmentState colorBlendAttachment;
+        {
+            colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            colorBlendAttachment.blendEnable = VK_FALSE;
+            colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
+            colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
+            colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
+            colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
+            colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
+            colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
+        }
+
+        VkPipelineColorBlendStateCreateInfo colorBlending;
+        {
+            colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+            colorBlending.pNext = NULL;
+            colorBlending.flags = 0;
+            colorBlending.logicOpEnable = VK_FALSE;
+            colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
+            colorBlending.attachmentCount = 1;
+            colorBlending.pAttachments = &colorBlendAttachment;
+            colorBlending.blendConstants[0] = 0.0f; // Optional
+            colorBlending.blendConstants[1] = 0.0f; // Optional
+            colorBlending.blendConstants[2] = 0.0f; // Optional
+            colorBlending.blendConstants[3] = 0.0f; // Optional
+            createInfo.pColorBlendState = &colorBlending;
+        }
+
+        VkDynamicState dynamicStates[] = {
+            VK_DYNAMIC_STATE_VIEWPORT,
+            VK_DYNAMIC_STATE_LINE_WIDTH
+        };
+
+        VkPipelineDynamicStateCreateInfo dynamicState;
+        {
+            dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+            dynamicState.pNext = NULL;
+            dynamicState.flags = 0;
+            dynamicState.dynamicStateCount = 2;
+            dynamicState.pDynamicStates = dynamicStates;
+            createInfo.pDynamicState = &dynamicState;
+        }
+
+        createInfo.pDepthStencilState = NULL;
+
+        createInfo.layout = VK_NULL_HANDLE; // TODO
+    }
+
+    NK_CHECK_VK(vkCreateGraphicsPipelines(device->device, VK_NULL_HANDLE, 1, &createInfo, NULL, &renderPipeline->pipeline));
 
     return renderPipeline;
 }
