@@ -1,4 +1,4 @@
-# Neko [![License](https://img.shields.io/github/license/nyalloc/neko.svg)](https://github.com/nyalloc/neko/blob/master/LICENSE)
+# Neko [![License](https://img.shields.io/github/license/nyalloc/neko)](https://github.com/nyalloc/neko/blob/main/LICENSE)
 
 Neko is an early-stage 3D graphics API wrapper. It is implemented as a dependency-free [STB-style](https://github.com/nothings/stb/blob/master/docs/stb_howto.txt) header-only C library. It will sit on top of Vulkan, D3D12 and Metal and define a higher-level WebGPU-style interface. The intended users are developers who want to prototype or implement small game engines. Neko will bring the most important capabilities of modern low-level graphics APIs, but restore the joy of working with high-level APIs. Neko is influenced by the development of WebGPU and will develop alongside it.
 
