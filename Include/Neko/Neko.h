@@ -1,5 +1,3 @@
-#pragma once
-
 #ifndef NEKO_H
 #define NEKO_H
 
@@ -98,8 +96,6 @@ typedef struct HWND__* HWND;
 #endif
 
 #include <stdint.h>
-#include <stddef.h>
-#include <stdbool.h>
 
 typedef uint32_t NkFlags;
 
@@ -1031,7 +1027,7 @@ NkBool nkCanSatisfyAllocation(uintptr_t buffer, uint32_t bufferSize, uint32_t al
     if (allocStart < bufferHead)
     {
         // Alignment made us overflow
-        return false;
+        return NkFalse;
     }
 
     uintptr_t allocEnd = allocStart + size;
@@ -1040,7 +1036,7 @@ NkBool nkCanSatisfyAllocation(uintptr_t buffer, uint32_t bufferSize, uint32_t al
     if (allocEnd <= allocStart)
     {
         // Requested size made us overflow
-        return false;
+        return NkFalse;
     }
 
     uintptr_t allocSize = allocEnd - bufferHead;
@@ -1050,11 +1046,11 @@ NkBool nkCanSatisfyAllocation(uintptr_t buffer, uint32_t bufferSize, uint32_t al
     if (newAllocatedSize <= bufferSize)
     {
         // Still has free space, we fit
-        return true;
+        return NkTrue;
     }
 
     // Not enough space
-    return false;
+    return NkFalse;
 }
 
 void* nkAllocateFromBuffer(uintptr_t buffer, uint32_t bufferSize, uint32_t* allocatedSize, size_t size, size_t alignment, uint32_t* const outAllocationOffset) {
@@ -1864,10 +1860,10 @@ VkBool32 nkVkShouldEnablePrimitiveRestart(NkPrimitiveTopology topology) {
     case NkPrimitiveTopology_PointList:
     case NkPrimitiveTopology_LineList:
     case NkPrimitiveTopology_TriangleList:
-        return false;
+        return NkFalse;
     case NkPrimitiveTopology_LineStrip:
     case NkPrimitiveTopology_TriangleStrip:
-        return true;
+        return NkTrue;
     }
 }
 
